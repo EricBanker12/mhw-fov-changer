@@ -1,10 +1,31 @@
 // dllmain.cpp : Defines the entry point for the DLL application.
-#include "Windows.h"
-#include "loader.h"
+#include <filesystem>
+#include <fstream>
+#include <loader.h>
+#include <nlohmann/json.hpp>
+#include <tlhelp32.h>
+#include <Windows.h>
+
+using namespace loader;
+
+nlohmann::json ConfigFile;
 
 void onLoad()
 {
-    loader::LOG(loader::ERR) << "Example plugin test log";
+    LOG(INFO) << "FoV Changer Loading...";
+    if (std::string(GameVersion) != "404549") {
+        LOG(ERR) << "FoV Changer: Wrong version";
+        return;
+    }
+
+    ConfigFile = nlohmann::json::object();
+    std::ifstream config("nativePC\\plugins\\FoVChanger.json");
+    if (config.fail()) return;
+
+    config >> ConfigFile;
+    LOG(INFO) << "FoV Changer: Found config file";
+
+    LOG(INFO) << "DONE !";
 }
 
 BOOL APIENTRY DllMain( HMODULE hModule,
