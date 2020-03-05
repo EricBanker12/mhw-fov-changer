@@ -5,6 +5,8 @@
 #include <nlohmann/json.hpp>
 #include <tlhelp32.h>
 #include <Windows.h>
+#include <chrono>
+#include <thread>
 
 using namespace loader;
 
@@ -51,6 +53,29 @@ DWORD_PTR FindPointerAddress(HANDLE phandle, DWORD_PTR ptr, DWORD_PTR offsets[],
     return ptr;
 }
 
+void changeFov(HANDLE phandle, DWORD_PTR address)
+{
+    float fov;
+    float prevFov;
+    while (true)
+    {
+        ReadProcessMemory(phandle, (LPCVOID)address, &fov, sizeof(fov), 0);
+        if (fabsf(prevFov - fov) > 1)
+        {
+            if (ConfigFile.value<bool>("forceConstantFoV", false))
+            {
+                prevFov = fov = ConfigFile.value<float>("customFoV", 70);
+            }
+            else
+            {
+                prevFov = fov = fov * ConfigFile.value<float>("customFoV", 70) / 53.0;
+            }
+            WriteProcessMemory(phandle, (LPVOID)address, &fov, sizeof(fov), 0);
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+}
+
 void onLoad()
 {
     LOG(INFO) << "FoV Changer Loading...";
@@ -71,10 +96,7 @@ void onLoad()
     DWORD_PTR fovPointer = 0x0;
     DWORD_PTR fovPointerOffsets[] = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0};
     DWORD_PTR fovAddress = FindPointerAddress(phandle, fovPointer, fovPointerOffsets, 7);
-    float fovValue;
-    ReadProcessMemory(phandle, (LPCVOID)fovAddress, &fovValue, sizeof(fovValue), 0);
-    fovValue = fovValue * 1.2;
-    WriteProcessMemory(phandle, (LPVOID)fovAddress, &fovValue, sizeof(fovValue), 0);
+    std::thread fovChanger(changeFov, phandle, fovAddress);
 
     LOG(INFO) << "DONE !";
 }
