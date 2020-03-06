@@ -48,29 +48,39 @@ DWORD_PTR FindPointerAddress(HANDLE phandle, DWORD_PTR ptr, DWORD_PTR offsets[],
     DWORD_PTR ptrAddress;
     for (int i = 0; i < n; i++) {
         ReadProcessMemory(phandle, (LPCVOID)ptr, &ptrAddress, sizeof(ptrAddress), 0);
+        if (ptrAddress == 0) return 0;
         ptr = ptrAddress + offsets[i];
     }
     return ptr;
 }
 
-void changeFov(HANDLE phandle, DWORD_PTR address)
+void changeFov(HANDLE phandle, DWORD_PTR ptr, DWORD_PTR offsets[], int n)
 {
-    float fov;
-    float prevFov;
+    DWORD_PTR address = 0;
+    float fov = 53;
+    float prevFov = 0;
     while (true)
     {
-        ReadProcessMemory(phandle, (LPCVOID)address, &fov, sizeof(fov), 0);
-        if (fabsf(prevFov - fov) > 1)
+        if (address == 0)
         {
-            if (ConfigFile.value<bool>("forceConstantFoV", false))
+            address = FindPointerAddress(phandle, ptr, offsets, n);
+        }
+        else
+        {
+            ReadProcessMemory(phandle, (LPCVOID)address, &fov, sizeof(fov), 0);
+            if (fabsf(prevFov - fov) > 1)
             {
-                prevFov = fov = ConfigFile.value<float>("customFoV", 70);
+                if (ConfigFile.value<bool>("forceConstantFoV", false))
+                {
+                    prevFov = fov = ConfigFile.value<float>("customFoV", 70);
+                }
+                else
+                {
+                    float multiplier = ConfigFile.value<float>("customFoV", 70) / 53;
+                    prevFov = fov = fov * multiplier;
+                }
+                WriteProcessMemory(phandle, (LPVOID)address, &fov, sizeof(fov), 0);
             }
-            else
-            {
-                prevFov = fov = fov * ConfigFile.value<float>("customFoV", 70) / 53.0;
-            }
-            WriteProcessMemory(phandle, (LPVOID)address, &fov, sizeof(fov), 0);
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
@@ -78,7 +88,7 @@ void changeFov(HANDLE phandle, DWORD_PTR address)
 
 void onLoad()
 {
-    LOG(INFO) << "FoV Changer Loading...";
+    LOG(INFO) << "FoV Changer: Loading...";
     if (std::string(GameVersion) != "404549") {
         LOG(ERR) << "FoV Changer: Wrong version";
         return;
@@ -93,10 +103,9 @@ void onLoad()
 
     DWORD procID = FindProcessId(L"MonsterHunterWorld.exe");
     HANDLE phandle = OpenProcess(PROCESS_ALL_ACCESS, FALSE, procID);
-    DWORD_PTR fovPointer = 0x0;
-    DWORD_PTR fovPointerOffsets[] = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0};
-    DWORD_PTR fovAddress = FindPointerAddress(phandle, fovPointer, fovPointerOffsets, 7);
-    std::thread fovChanger(changeFov, phandle, fovAddress);
+    DWORD_PTR fovPointer = 0x140000000 + 0x4df25d0;
+    DWORD_PTR fovPointerOffsets[] = {0x108, 0x718, 0x20, 0x180, 0x38, 0x0, 0x5F0};
+    std::thread fovChanger(changeFov, phandle, fovPointer, fovPointerOffsets, 7);
 
     LOG(INFO) << "DONE !";
 }
