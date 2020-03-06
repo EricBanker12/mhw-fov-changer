@@ -71,7 +71,6 @@ void changeFov()
         if (i >= 100)
         {
             fovAddress = FindPointerAddress(phandle, fovPointer, fovPointerOffsets, 7);
-            if (fovAddress != 0) LOG(INFO) << "FoV Changer: Found FoV address: " << fovAddress;
             i = 0;
         }
         if (fovAddress != 0)
@@ -79,7 +78,7 @@ void changeFov()
             ReadProcessMemory(phandle, (LPCVOID)fovAddress, &fov, sizeof(fov), 0);
             if (fabsf(prevFov - fov) > 1)
             {
-                LOG(INFO) << "FoV Changer: Old FoV: " << fov;
+                float oldFov = fov;
                 if (ConfigFile.value<bool>("forceConstantFoV", false))
                 {
                     prevFov = fov = ConfigFile.value<float>("customFoV", 59);
@@ -89,7 +88,7 @@ void changeFov()
                     float multiplier = ConfigFile.value<float>("customFoV", 59) / 53;
                     prevFov = fov = fov * multiplier;
                 }
-                LOG(INFO) << "FoV Changer: New FoV: " << fov;
+                LOG(INFO) << "FoV Changer: " << oldFov << " -> " << fov;
                 WriteProcessMemory(phandle, (LPVOID)fovAddress, &fov, sizeof(fov), 0);
             }
         }
