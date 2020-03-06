@@ -12,6 +12,8 @@ using namespace loader;
 
 nlohmann::json ConfigFile;
 
+std::thread FovChanger;
+
 // https://stackoverflow.com/a/55030118
 DWORD FindProcessId(const std::wstring& processName)
 {
@@ -54,38 +56,50 @@ DWORD_PTR FindPointerAddress(HANDLE phandle, DWORD_PTR ptr, DWORD_PTR offsets[],
     return ptr;
 }
 
-void changeFov(HANDLE phandle, DWORD_PTR ptr, DWORD_PTR offsets[], int n)
+void changeFov()
 {
-    DWORD_PTR address = 0;
+    DWORD procID = FindProcessId(L"MonsterHunterWorld.exe");
+    HANDLE phandle = OpenProcess(PROCESS_ALL_ACCESS, FALSE, procID);
+    DWORD_PTR fovPointer = 0x140000000 + 0x4df25d0;
+    DWORD_PTR fovPointerOffsets[] = { 0x108, 0x718, 0x20, 0x180, 0x38, 0x0, 0x5F0 };
+    DWORD_PTR fovAddress = 0;
     float fov = 53;
     float prevFov = 0;
+    int i = 0;
     while (true)
     {
-        address = FindPointerAddress(phandle, ptr, offsets, n);
-        if (address != 0)
+        if (i >= 100)
         {
-            ReadProcessMemory(phandle, (LPCVOID)address, &fov, sizeof(fov), 0);
+            fovAddress = FindPointerAddress(phandle, fovPointer, fovPointerOffsets, 7);
+            if (fovAddress != 0) LOG(INFO) << "FoV Changer: Found FoV address: " << fovAddress;
+            i = 0;
+        }
+        if (fovAddress != 0)
+        {
+            ReadProcessMemory(phandle, (LPCVOID)fovAddress, &fov, sizeof(fov), 0);
             if (fabsf(prevFov - fov) > 1)
             {
+                LOG(INFO) << "FoV Changer: Old FoV: " << fov;
                 if (ConfigFile.value<bool>("forceConstantFoV", false))
                 {
-                    prevFov = fov = ConfigFile.value<float>("customFoV", 70);
+                    prevFov = fov = ConfigFile.value<float>("customFoV", 59);
                 }
                 else
                 {
-                    float multiplier = ConfigFile.value<float>("customFoV", 70) / 53;
+                    float multiplier = ConfigFile.value<float>("customFoV", 59) / 53;
                     prevFov = fov = fov * multiplier;
                 }
-                WriteProcessMemory(phandle, (LPVOID)address, &fov, sizeof(fov), 0);
+                LOG(INFO) << "FoV Changer: New FoV: " << fov;
+                WriteProcessMemory(phandle, (LPVOID)fovAddress, &fov, sizeof(fov), 0);
             }
         }
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        i++;
     }
 }
 
 void onLoad()
 {
-    LOG(INFO) << "FoV Changer: Loading...";
     if (std::string(GameVersion) != "404549") {
         LOG(ERR) << "FoV Changer: Wrong version";
         return;
@@ -96,15 +110,9 @@ void onLoad()
     if (config.fail()) return;
 
     config >> ConfigFile;
-    LOG(INFO) << "FoV Changer: Found config file";
+    LOG(INFO) << "FoV Changer: Loaded config file";
 
-    DWORD procID = FindProcessId(L"MonsterHunterWorld.exe");
-    HANDLE phandle = OpenProcess(PROCESS_ALL_ACCESS, FALSE, procID);
-    DWORD_PTR fovPointer = 0x140000000 + 0x4df25d0;
-    DWORD_PTR fovPointerOffsets[] = {0x108, 0x718, 0x20, 0x180, 0x38, 0x0, 0x5F0};
-    std::thread fovChanger(changeFov, phandle, fovPointer, fovPointerOffsets, 7);
-
-    LOG(INFO) << "DONE !";
+    FovChanger = std::thread(changeFov);
 }
 
 BOOL APIENTRY DllMain( HMODULE hModule,
