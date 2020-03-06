@@ -61,11 +61,8 @@ void changeFov(HANDLE phandle, DWORD_PTR ptr, DWORD_PTR offsets[], int n)
     float prevFov = 0;
     while (true)
     {
-        if (address == 0)
-        {
-            address = FindPointerAddress(phandle, ptr, offsets, n);
-        }
-        else
+        address = FindPointerAddress(phandle, ptr, offsets, n);
+        if (address != 0)
         {
             ReadProcessMemory(phandle, (LPCVOID)address, &fov, sizeof(fov), 0);
             if (fabsf(prevFov - fov) > 1)
