@@ -60,8 +60,8 @@ void changeFov()
 {
     DWORD procID = FindProcessId(L"MonsterHunterWorld.exe");
     HANDLE phandle = OpenProcess(PROCESS_ALL_ACCESS, FALSE, procID);
-    DWORD_PTR fovPointer = 0x140000000 + 0x4df25d0;
-    DWORD_PTR fovPointerOffsets[] = { 0x108, 0x718, 0x20, 0x180, 0x38, 0x0, 0x5F0 };
+    DWORD_PTR fovPointer = 0x140000000 + 0x4eca860;
+    DWORD_PTR fovPointerOffsets[] = { 0x58, 0xc30, 0x38, 0x10, 0x10, 0x0, 0x5F0 };
     DWORD_PTR fovAddress = 0;
     float fov = 53;
     float prevFov = 0;
