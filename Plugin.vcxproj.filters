@@ -23,6 +23,8 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <CopyFileToFolders Include="FoVChanger.json" />
+    <CopyFileToFolders Include="FoVChanger.json">
+      <Filter>Resource Files</Filter>
+    </CopyFileToFolders>
   </ItemGroup>
 </Project>

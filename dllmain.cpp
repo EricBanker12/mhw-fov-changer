@@ -99,7 +99,7 @@ void changeFov()
 
 void onLoad()
 {
-    if (std::string(GameVersion) != "404549") {
+    if (std::string(GameVersion) != "406510") {
         LOG(ERR) << "FoV Changer: Wrong version";
         return;
     }
