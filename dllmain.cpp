@@ -3,6 +3,7 @@
 #include <fstream>
 #include <loader.h>
 #include <nlohmann/json.hpp>
+#include <timeapi.h>
 #include <tlhelp32.h>
 #include <Windows.h>
 #include <chrono>
@@ -65,10 +66,11 @@ void changeFov()
     DWORD_PTR fovAddress = 0;
     float fov = 53;
     float prevFov = 0;
-    int i = 0;
+    INT16 i = 0;
+    timeBeginPeriod(5);
     while (true)
     {
-        if (i >= 100)
+        if (i >= 200)
         {
             fovAddress = FindPointerAddress(phandle, fovPointer, fovPointerOffsets, 7);
             i = 0;
@@ -92,9 +94,10 @@ void changeFov()
                 WriteProcessMemory(phandle, (LPVOID)fovAddress, &fov, sizeof(fov), 0);
             }
         }
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
         i++;
     }
+    timeEndPeriod(5);
 }
 
 void onLoad()
