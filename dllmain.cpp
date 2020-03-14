@@ -1,4 +1,5 @@
 // dllmain.cpp : Defines the entry point for the DLL application.
+#pragma comment(lib, "winmm.lib")
 #include <filesystem>
 #include <fstream>
 #include <loader.h>
