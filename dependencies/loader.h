@@ -3,7 +3,6 @@
 #include <sdkddkver.h>
 
 #include <sstream>
-#include <filesystem>
 #include <vector>
 
 #ifdef DINPUT8MHW_EXPORTS
@@ -22,26 +21,25 @@ namespace loader {
 		ERR = 3
 	};
 
+	DllExport extern const char* GameVersion;
+	DllExport extern LogLevel MinLogLevel;
 
 	class DllExport LOG
 	{
 	private:
-		std::stringstream s_;
-		LogLevel l_;
+		std::stringstream stream;
+		LogLevel logLevel;
 		LOG(const LOG& o) = delete;
 		LOG& operator=(const LOG& o) = delete;
 	public:
-		LOG(LogLevel l) :l_(l) {}
-
+		LOG(LogLevel level) :logLevel(level) {}
 		~LOG();
 
 		template<class T>
 		LOG& operator<<(const T& x) {
-			s_ << x;
+			if (logLevel >= MinLogLevel)
+				stream << x;
 			return *this;
 		}
 	};
-
-	DllExport extern const char* GameVersion;
-	DllExport extern LogLevel MinLogLevel;
 }

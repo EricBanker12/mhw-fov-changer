@@ -1,8 +1,10 @@
 // dllmain.cpp : Defines the entry point for the DLL application.
+#pragma comment(lib, "winmm.lib")
 #include <filesystem>
 #include <fstream>
 #include <loader.h>
 #include <nlohmann/json.hpp>
+#include <timeapi.h>
 #include <tlhelp32.h>
 #include <Windows.h>
 #include <chrono>
@@ -60,15 +62,16 @@ void changeFov()
 {
     DWORD procID = FindProcessId(L"MonsterHunterWorld.exe");
     HANDLE phandle = OpenProcess(PROCESS_ALL_ACCESS, FALSE, procID);
-    DWORD_PTR fovPointer = 0x140000000 + 0x4df25d0;
-    DWORD_PTR fovPointerOffsets[] = { 0x108, 0x718, 0x20, 0x180, 0x38, 0x0, 0x5F0 };
+    DWORD_PTR fovPointer = 0x140000000 + 0x4eca860;
+    DWORD_PTR fovPointerOffsets[] = { 0x58, 0xc30, 0x38, 0x10, 0x10, 0x0, 0x5F0 };
     DWORD_PTR fovAddress = 0;
     float fov = 53;
     float prevFov = 0;
-    int i = 0;
+    INT16 i = 0;
+    timeBeginPeriod(5);
     while (true)
     {
-        if (i >= 100)
+        if (i >= 200)
         {
             fovAddress = FindPointerAddress(phandle, fovPointer, fovPointerOffsets, 7);
             i = 0;
@@ -92,14 +95,15 @@ void changeFov()
                 WriteProcessMemory(phandle, (LPVOID)fovAddress, &fov, sizeof(fov), 0);
             }
         }
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
         i++;
     }
+    timeEndPeriod(5);
 }
 
 void onLoad()
 {
-    if (std::string(GameVersion) != "404549") {
+    if (std::string(GameVersion) != "406510") {
         LOG(ERR) << "FoV Changer: Wrong version";
         return;
     }
