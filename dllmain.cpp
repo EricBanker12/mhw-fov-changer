@@ -62,7 +62,7 @@ void changeFov()
 {
     DWORD procID = FindProcessId(L"MonsterHunterWorld.exe");
     HANDLE phandle = OpenProcess(PROCESS_ALL_ACCESS, FALSE, procID);
-    DWORD_PTR fovPointer = 0x140000000 + 0x04F535D0;
+    DWORD_PTR fovPointer = 0x140000000 + 0x04FBAAB0;
     DWORD_PTR fovPointerOffsets[] = { 0x58, 0x3A0 };
     DWORD_PTR fovAddress = 0;
     float fov = 53;
@@ -103,7 +103,7 @@ void changeFov()
 
 void onLoad()
 {
-    if (std::string(GameVersion) != "410918") {
+    if (std::string(GameVersion) != "413161") {
         LOG(ERR) << "FoV Changer: Wrong version";
         return;
     }
