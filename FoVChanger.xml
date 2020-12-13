@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <!-- Set a VERTICAL FoV to overwrite default FoV (53). -->
+  <!-- 90 horizontal FoV = 59 vertical FoV (on 16:9 monitor) -->
+  <!-- 120 horizontal FoV = 89 vertical FoV (on 16:9 monitor) -->
+  <!-- FoV calculator: https://themetalmuncher.github.io/fov-calc -->
+  <customFoV value="59" />
+
+  <!-- Special animations can change FoV (i.e. Gunner aiming reduces FoV ~15%). -->
+  <!-- Set to "0" to allow these FoV changes during gameplay. -->
+  <!-- Set to "1" to force constant FoV during gameplay. -->
+  <forceConstantFoV value="0" />
+
+  <!-- Set how often FoV changes are checked. -->
+  <!-- Set to "0" for once-per-frame (60 times per second at 60hz). -->
+  <!-- Set to "1" for no-limit (fixes single-frame jumps in FoV; increases CPU usage). -->
+  <allowHighCpuUsage value="0" />
+</configuration>
