@@ -1,20 +1,20 @@
 // dllmain.cpp : Defines the entry point for the DLL application.
 #pragma comment(lib, "winmm.lib")
-#include <filesystem>
-#include <fstream>
+
 #include <loader.h>
-#include <nlohmann/json.hpp>
+#include <tinyxml2/tinyxml2.h>
+
+#include <Windows.h>
 #include <timeapi.h>
 #include <tlhelp32.h>
-#include <Windows.h>
 #include <chrono>
 #include <thread>
 
 using namespace loader;
 
-nlohmann::json ConfigFile;
-
 std::thread FovChanger;
+
+bool playing;
 
 // https://stackoverflow.com/a/55030118
 DWORD FindProcessId(const std::wstring& processName)
@@ -23,7 +23,8 @@ DWORD FindProcessId(const std::wstring& processName)
     processInfo.dwSize = sizeof(processInfo);
 
     HANDLE processesSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, NULL);
-    if (processesSnapshot == INVALID_HANDLE_VALUE) {
+    if (processesSnapshot == INVALID_HANDLE_VALUE)
+    {
         return 0;
     }
 
@@ -50,7 +51,8 @@ DWORD FindProcessId(const std::wstring& processName)
 DWORD_PTR FindPointerAddress(HANDLE phandle, DWORD_PTR ptr, DWORD_PTR offsets[], int n)
 {
     DWORD_PTR ptrAddress;
-    for (int i = 0; i < n; i++) {
+    for (int i = 0; i < n; i++)
+    {
         ReadProcessMemory(phandle, (LPCVOID)ptr, &ptrAddress, sizeof(ptrAddress), 0);
         if (ptrAddress == 0) return 0;
         ptr = ptrAddress + offsets[i];
@@ -58,7 +60,24 @@ DWORD_PTR FindPointerAddress(HANDLE phandle, DWORD_PTR ptr, DWORD_PTR offsets[],
     return ptr;
 }
 
-void changeFov()
+int GetRefreshRate()
+{
+    DISPLAY_DEVICE displayDevice;
+    DEVMODE displayMode;
+    displayDevice.cb = sizeof(DISPLAY_DEVICE);
+    displayMode.dmSize = sizeof(DEVMODE);
+    int refreshRate = 30;
+    for (int i = 0; EnumDisplayDevices(0, i, &displayDevice, 1); i++)
+    {
+        if (EnumDisplaySettings(displayDevice.DeviceName, ENUM_CURRENT_SETTINGS, &displayMode))
+        {
+            refreshRate = max(refreshRate, (int)displayMode.dmDisplayFrequency);
+        }
+    }
+    return refreshRate;
+}
+
+void changeFov(float customFoV, bool forceConstantFoV, bool allowHighCpuUsage)
 {
     DWORD procID = FindProcessId(L"MonsterHunterWorld.exe");
     HANDLE phandle = OpenProcess(PROCESS_ALL_ACCESS, FALSE, procID);
@@ -67,55 +86,81 @@ void changeFov()
     DWORD_PTR fovAddress = 0;
     float fov = 53;
     float prevFov = 0;
-    INT16 i = 0;
-    timeBeginPeriod(5);
-    while (true)
+    clock_t checkPointerTime = clock();
+    int interval = 1000 / GetRefreshRate();
+    if (!allowHighCpuUsage) timeBeginPeriod(interval);
+    while (playing)
     {
-        if (i >= 200)
-        {
-            fovAddress = FindPointerAddress(phandle, fovPointer, fovPointerOffsets, 2);
-            i = 0;
-        }
+        clock_t now = clock();
         if (fovAddress != 0)
         {
             ReadProcessMemory(phandle, (LPCVOID)fovAddress, &fov, sizeof(fov), 0);
+            // increase FoV if it changed in-game
             if (fabsf(prevFov - fov) > 1)
             {
                 float oldFov = fov;
-                if (ConfigFile.value<bool>("forceConstantFoV", false))
+                if (forceConstantFoV)
                 {
-                    prevFov = fov = ConfigFile.value<float>("customFoV", 59);
+                    prevFov = fov = customFoV;
                 }
                 else
                 {
-                    float multiplier = ConfigFile.value<float>("customFoV", 59) / 53;
+                    float multiplier = customFoV / 53;
                     prevFov = fov = fov * multiplier;
                 }
-                LOG(INFO) << "FoV Changer: " << oldFov << " -> " << fov;
                 WriteProcessMemory(phandle, (LPVOID)fovAddress, &fov, sizeof(fov), 0);
+                LOG(INFO) << "FoV Changer: " << oldFov << " -> " << fov;
             }
         }
-        std::this_thread::sleep_for(std::chrono::milliseconds(5));
-        i++;
+        // check if the character logged in/out
+        if (now - checkPointerTime > CLOCKS_PER_SEC)
+        {
+            checkPointerTime += CLOCKS_PER_SEC;
+            fovAddress = FindPointerAddress(phandle, fovPointer, fovPointerOffsets, 2);
+        }
+        // wait for the next screen refresh
+        if (!allowHighCpuUsage) {
+            int delta = clock() - now;
+            if (delta < interval)
+            {
+                std::this_thread::sleep_for(std::chrono::milliseconds(interval - delta));
+            }
+        }
     }
-    timeEndPeriod(5);
+    if (!allowHighCpuUsage) timeEndPeriod(interval);
 }
 
 void onLoad()
 {
-    if (std::string(GameVersion) != "421409") {
+    // check game version
+    if (std::string(GameVersion) != "421409")
+    {
         LOG(ERR) << "FoV Changer: Wrong version";
         return;
     }
 
-    ConfigFile = nlohmann::json::object();
-    std::ifstream config("nativePC\\plugins\\FoVChanger.json");
-    if (config.fail()) return;
+    // read config file
+    tinyxml2::XMLDocument doc;
+    if (doc.LoadFile("nativePC\\plugins\\FoVChanger.xml"))
+    {
+        LOG(ERR) << "FoV Changer: Bad/Missing Config";
+        return;
+    }
+    
+    // read values from file
+    float customFoV = doc.RootElement()->FirstChildElement("customFoV")->FloatAttribute("value", 59);
+    bool forceConstantFoV = doc.RootElement()->FirstChildElement("forceConstantFoV")->BoolAttribute("value", false);
+    bool allowHighCpuUsage = doc.RootElement()->FirstChildElement("allowHighCpuUsage")->BoolAttribute("value", false);
+    
+    // run main function loop
+    playing = true;
+    FovChanger = std::thread(changeFov, customFoV, forceConstantFoV, allowHighCpuUsage);
+}
 
-    config >> ConfigFile;
-    LOG(INFO) << "FoV Changer: Loaded config file";
-
-    FovChanger = std::thread(changeFov);
+void onExit()
+{
+    playing = false;
+    FovChanger.join();
 }
 
 BOOL APIENTRY DllMain( HMODULE hModule,
@@ -130,7 +175,9 @@ BOOL APIENTRY DllMain( HMODULE hModule,
         break;
     case DLL_THREAD_ATTACH:
     case DLL_THREAD_DETACH:
+        break;
     case DLL_PROCESS_DETACH:
+        onExit();
         break;
     }
     return TRUE;
