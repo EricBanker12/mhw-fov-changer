@@ -133,7 +133,7 @@ void changeFov(float customFoV, bool forceConstantFoV, bool allowHighCpuUsage)
 void onLoad()
 {
     // check game version
-    if (std::string(GameVersion) != "421470")
+    if (std::string(GameVersion) != "421470" && std::string(GameVersion) != "421471")
     {
         LOG(ERR) << "FoV Changer: Wrong version";
         return;
